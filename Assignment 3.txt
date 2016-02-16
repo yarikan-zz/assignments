@@ -1,0 +1,203 @@
+﻿-- QUESTION 1: HANDLERS EXPLORATION
+-- Use hhadler table which provides registration forms for hazardous waste handlers
+
+-- a) How many forms have been received by the EPA?
+SELECT COUNT(receive_date)
+FROM hhandler;
+-- A total of 2,280,394 forms have been received by the EPA.
+
+
+-- (b) How many facilities have registered? Hint: use the count(distinct ) function
+SELECT COUNT (DISTINCT epa_handler_id)
+FROM hhandler;
+-- A total of 856,529 facilities have registered.
+
+
+-- (c) How many forms were received per year over the last 5 years?
+-- Hint: Convert the receive_date to a date using ::date and use a GROUP BY. 
+SELECT extract(YEAR from receive_date::date), count(*)
+FROM hhandler
+WHERE extract(YEAR from receive_date::date)='2012'
+OR extract(YEAR from receive_date::date)='2013'
+OR extract(YEAR from receive_date::date)='2014'
+OR extract(YEAR from receive_date::date)='2015'
+OR extract(YEAR from receive_date::date)='2016'
+GROUP BY 1
+ORDER BY 1;
+-- FYI I'm assuming that "last 5 years" includes records so far for 2016.
+-- 92,413 forms were received in 2012.
+-- 87,378 forms were received in 2013.
+-- 128,099 forms were received in 2014.
+-- 59,757 forms were received in 2015.
+-- 2,844 forms were received so far in 2016.
+
+
+-- QUESTION 2: EVALUATIONS
+-- The cmecomp3 table contains a list of evaluations (inspections) of these handlers. See the data dictionary here.
+
+-- (a) How many evaluations are there?
+SELECT COUNT(evaluation_identifier)
+FROM cmecomp3;
+-- There are 2,060,714 evaluations.
+
+
+-- (b) How many evaluations found violations?
+SELECT COUNT(evaluation_identifier)
+FROM cmecomp3
+WHERE found_violation_flag='Y';
+-- 1,478,260 inspections found violations.
+
+-- Note to self, can calculate the same result using fewer lines as follows:
+-- SELECT sum((found_violation_flag='Y')::int)
+-- FROM cmecomp3;
+
+
+-- (c) What proportion of evaluations found violations?
+SELECT (sum((found_violation_flag='Y')::int)*1.0 / COUNT(evaluation_identifier))*100
+FROM cmecomp3;
+-- Approximatey 72% of inspections found violations.
+
+
+-- (d) Which five handler_ids have been found in violation the most times? How many times? 
+-- Also find these handlers' site names in the hhandlers table.
+-- Hint: Use a GROUP BY and an ORDER BY DESC.
+
+-- I solved part (d) in two steps. Here is step 1: 
+SELECT handler_id, count(*)
+FROM cmecomp3
+WHERE found_violation_flag='Y'
+GROUP BY 1
+ORDER BY 2 DESC;
+
+-- Using what I found in Step 1, here is Step 2: 
+SELECT current_site_name, epa_handler_id
+FROM hhandler
+WHERE epa_handler_id='KYD053348108'
+OR epa_handler_id='ILD048843809'
+OR epa_handler_id='ILD006296800'
+OR epa_handler_id='KY0000005785'
+OR epa_handler_id='ILD000714881'
+GROUP BY epa_handler_id, current_site_name
+ORDER BY epa_handler_id;
+
+-- The top 5 violators are as follows, starting with the most frequent one:
+-- Handler KYD053348108 (Safety - Kleen Systems) with 4,772 violations.
+-- Handler ILD048843809 (Chemet Co) with 4,311 violations.
+-- Handler ILD006296800 (Musick Plating CO) with 3,481 violations.
+-- Handler KY0000005785 (Designtec Recycling Center) with 2,396 violations.
+-- Handler ILD000714881 (Keystone Steel & Wire CO) with 2,379 violations.
+
+
+-- QUESTION 3: INDUSTRIES
+-- The North American Industry Classification System is a system used by federal agencies 
+-- to classify a business according to its industry. The naics table contains this information 
+-- as retrieved from here. Start by skimming this file.
+
+-- (a) How many different naics codes are there? 
+-- How many six-digit industry classifications are there? 
+-- How many two-digit classifications are there? These determine the sectors as described here.
+
+SELECT COUNT (DISTINCT naics)
+FROM naics
+WHERE naics <> '------';
+-- There are a total of 2,015 different classifications.
+
+SELECT COUNT(naics)
+FROM naics
+WHERE naics SIMILAR TO '[0-9]*';
+-- There are 978 different six-digit industry classifications.
+
+SELECT COUNT(naics)
+FROM naics
+WHERE naics SIMILAR TO '[0-9][0-9][^0-9]*';
+-- There are 20 two-digit classifications.
+
+
+-- (b) The hnaics table contains naics codes for some handlers. 
+-- How many handlers have naics codes? How many don't?
+SELECT COUNT(DISTINCT epa_handler_id)
+FROM hnaics
+WHERE naics_code SIMILAR TO '[0-9]*';
+-- 437,962 handlers do have naics codes.
+
+SELECT COUNT(DISTINCT epa_handler_id) - 
+(SELECT COUNT(DISTINCT epa_handler_id) 
+FROM hnaics 
+WHERE naics_code SIMILAR TO '[0-9]*')
+FROM hnaics;
+-- 91 handlers do NOT have naics codes.
+
+
+-- (c) Join the hnaics table with the naics table and use a GROUP BY to determine the number of 
+-- facilities in each sector. Which sector has the most hazardous-waste handlers? The least?
+-- Hint: You can get the digit naics code from the naics_code using this expression: 
+-- substring(naics_code for 2) || '----'
+-- Hint: group by naics_description to get the description instead of the code.
+
+SELECT (substring(hnaics.naics_code for 2) || '----'), naics.naics_description, count(distinct hnaics.epa_handler_id)
+FROM hnaics
+JOIN naics 
+	ON naics.naics = substring(hnaics.naics_code for 2) || '----'
+GROUP BY 1,2
+ORDER BY 3 DESC; 
+-- For the number of facilities in each sector, see the table generated. 
+-- Sector 81, Other Services, has the most hazardous-waste handlers with 73,240. 
+-- Sector 55, Management of Companies and Enterprises, has the least number of handlers with 426.
+
+	
+-- (d) Create a temporary table called hsectors containing unique pairs of handler ids and sector descriptions.
+-- Hint: Use a GROUP BY to ensure only unique pairs.
+-- Note: We'll discuss creating temporary tables in class on Thursday.
+
+CREATE TEMP TABLE hsectors AS (
+	SELECT naics.naics_description, hnaics.epa_handler_id
+	FROM hnaics
+	JOIN naics 
+		ON naics.naics = substring(hnaics.naics_code for 2) || '----'
+	GROUP BY 1,2,3);
+
+SELECT * FROM hsectors limit 5;
+
+-- (e) Join hsectors to cmecomp3, to determine for each sector: the number of handlers evaluated, 
+-- the number of evaluations, the number of violations, and the proportion of evaluations finding violations. 
+-- Which sector has the most violations? The highest proportion of evaluations finding violations?
+
+-- To find number of handlers evaluated per sector:
+SELECT hsectors.naics_description, COUNT(DISTINCT cmecomp3.handler_id)
+FROM hsectors
+JOIN cmecomp3
+	ON hsectors.epa_handler_id = cmecomp3.handler_id
+GROUP BY 1
+ORDER BY 2 DESC;
+-- Sector with greatest number of handlers evaluated: Other Services (except Public Administration).
+-- Sector with least number of handlers evaluated: Management of Companies and Enterprises.
+
+-- To find number of evaluations per sector:
+SELECT hsectors.naics_description, COUNT(cmecomp3.evaluation_identifier)
+FROM hsectors
+JOIN cmecomp3
+	ON hsectors.epa_handler_id = cmecomp3.handler_id
+GROUP BY 1
+ORDER BY 2 DESC;
+-- Sector with greatest number of evaluations: Administrative and Support and Waste Management and Remediation Services.
+-- Sector with least number of evaluations: Accommodation and Food Services.
+
+-- To find the number of violations per sector:
+SELECT hsectors.naics_description, COUNT(cmecomp3.found_violation_flag='Y')
+FROM hsectors
+JOIN cmecomp3
+	ON hsectors.epa_handler_id = cmecomp3.handler_id
+GROUP BY 1
+ORDER BY 2 DESC;
+-- Sector with greatest number of violations: Administrative and Support and Waste Management and Remediation Services.
+-- Sector with least number of violations: Accommodation and Food Services.
+
+-- To find the proportion of evaluations finding violations, per sector:
+SELECT hsectors.naics_description, (sum((cmecomp3.found_violation_flag='Y')::int)*1.0 / (COUNT(cmecomp3.found_violation_flag))*100)
+FROM hsectors
+JOIN cmecomp3
+	ON hsectors.epa_handler_id = cmecomp3.handler_id
+GROUP BY 1
+ORDER BY 2 DESC;
+-- Sector with highest percentage of evaluations finding violations: Educational Services.
+-- Sector with lowest percentage of evaluations finding violations: Finance and Insurance.
