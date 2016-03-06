@@ -1,0 +1,20 @@
+part a) +5. Good start, so I’m giving you some points here even though it doesn’t technically pass the rubric.
+
+-5 on part D: asked for last 25 years, but correct code.
+
+Question a: [up to 20 pts]
+	•	Handling of different date separator in document - 5 points
+	•	Handling that there are multiple crashes per some bullets - 10 points
+	•	Properly extracting the links - 5 points
+Question b:
+	•	Parsing of html using beautiful soup - 5 pts
+	•	Looping over table rows <tr> in the document - 10 pts
+	•	Statements that use the content of <th> to determine which item to update - 10 pts
+	•	Using regex or something else to pull out numbers from the text associated with Fatalities, etc. (the integer fields) - 10 pts
+	•	Saving the text associated with a <td> to pull out the text associated with Destinations, etc. (the string fields) - 10 pts
+Question c:
+	•	20 pts
+Question d:
+	•	20 pts
+Question e:
+	•	15 pts
